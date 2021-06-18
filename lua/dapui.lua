@@ -6,6 +6,7 @@ local sidebar_open = true
 local tray_open = true
 
 local config = require("dapui.config")
+local state = require("dapui.state")
 
 local function element(name)
   return require("dapui.elements." .. name)
@@ -65,6 +66,7 @@ end
 
 function M.setup(user_config)
   config.setup(user_config)
+  state.setup()
 
   require("dapui.highlights").setup()
 

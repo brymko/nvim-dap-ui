@@ -77,7 +77,7 @@ function Element:fill_render_state(render_state, stopped_thread)
       secondary_threads[k] = thread
     end
   end
-  self:render_threads("DapUIStoppedThread", {self.threads[stopped_thread]}, render_state)
+  self:render_threads("DapUIStoppedThread", {state.threads()[stopped_thread]}, render_state)
   render_state:add_line()
   self:render_threads("DapUIThread", secondary_threads, render_state)
 end
@@ -106,7 +106,9 @@ function M.open_frame()
 end
 
 function M.setup()
-  state.on_refresh(Element.render)
+  state.on_refresh(function (session)
+    Element:render(session)
+  end)
 end
 
 M.name = "DAP Stacks"
@@ -121,7 +123,7 @@ function M.on_open(buf, render_receiver)
     buf
   )
   Element.render_receivers[buf] = render_receiver
-  Element:render(require("dap").session())
+  state.refresh()
   local dap = require("dap")
   dap.listeners.before.event_terminated[listener_id] = function()
     reset_state()

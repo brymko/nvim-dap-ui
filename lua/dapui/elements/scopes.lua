@@ -17,24 +17,24 @@ local function var_from_ref_path(ref_path)
   return tonumber(var_path_elems[#var_path_elems])
 end
 
-function Element:reference_prefix(ref_path)
+local function reference_prefix(ref_path, expanded_paths)
   if vim.endswith(ref_path, "/0") then
     return " "
   end
-  return config.icons()[self.expanded_references[ref_path] and "expanded" or "collapsed"]
+  return config.icons()[expanded_paths[ref_path] and "expanded" or "collapsed"]
 end
 
-function Element:render_variables(ref_path, render_state, indent, expanded)
-  expanded[ref_path] = true
+local function render_variables(line_map, ref_path, render_state, indent, is_expanded, expanded_paths)
+  is_expanded[ref_path] = true
   local var_path_elems = vim.split(ref_path, "/")
   local var_ref = tonumber(var_path_elems[#var_path_elems])
   for _, variable in pairs(state.variables(var_ref)) do
     local line_no = render_state:length() + 1
     local var_reference_path = ref_path .. "/" .. variable.variablesReference
-    self.line_variable_map[line_no] = var_reference_path
+    line_map[line_no] = var_reference_path
 
     local new_line = string.rep(" ", indent)
-    local prefix = self:reference_prefix(var_reference_path)
+    local prefix = reference_prefix(var_reference_path, expanded_paths)
     render_state:add_match("DapUIDecoration", line_no, #new_line + 1, 1)
     new_line = new_line .. prefix .. " "
 
@@ -62,8 +62,8 @@ function Element:render_variables(ref_path, render_state, indent, expanded)
       render_state:add_line(new_line)
     end
 
-    if self.expanded_references[var_reference_path] and not expanded[var_reference_path] then
-      self:render_variables(var_reference_path, render_state, indent + config.windows().indent, expanded)
+    if expanded_paths[var_reference_path] and not is_expanded[var_reference_path] then
+      render_variables(line_map, var_reference_path, render_state, indent + config.windows().indent, is_expanded, expanded_paths)
     end
   end
 end
@@ -73,8 +73,8 @@ function Element:render_scopes(render_state)
   for i, scope in pairs(state.scopes()) do
     render_state:add_match("DapUIScope", render_state:length() + 1, 1, #scope.name)
     render_state:add_line(scope.name .. ":")
-    self:render_variables(tostring(scope.variablesReference), render_state, config().windows.indent, expanded)
-    if i < #self.scopes then
+    render_variables(self.line_variable_map, tostring(scope.variablesReference), render_state, config.windows().indent, expanded, self.expanded_references)
+    if i < #state.scopes() then
       render_state:add_line()
     end
   end
@@ -138,7 +138,9 @@ function M.on_close(info)
 end
 
 function M.setup()
-  state.on_refresh(Element.render)
+  state.on_refresh(function (session)
+    Element:render(session)
+  end)
 end
 
 return M
