@@ -2,15 +2,13 @@ local M = {}
 local api = vim.api
 local listener_id = "dapui_stack"
 
+local state = require("dapui.state")
 local config = require("dapui.config")
 
 local Element = {}
 
 local function reset_state()
   Element.render_receivers = {}
-  Element.threads = {}
-  Element.thread_frames = {}
-  Element.current_frame_id = nil
   Element.line_frame_map = {}
 end
 
@@ -62,7 +60,7 @@ function Element:render_threads(match_group, threads, render_state)
     local thread = threads[ordered_keys[i]]
     render_state:add_match(match_group, render_state:length() + 1, 1, #thread.name)
     render_state:add_line(thread.name .. ":")
-    self:render_frames(self.thread_frames[thread.id], render_state, config.windows().indent)
+    self:render_frames(state.frames(thread.id), render_state, config.windows().indent)
     if i < #ordered_keys then
       render_state:add_line()
     end
@@ -70,11 +68,11 @@ function Element:render_threads(match_group, threads, render_state)
 end
 
 function Element:fill_render_state(render_state, stopped_thread)
-  if not self.threads then
+  if not state.threads() then
     return
   end
   local secondary_threads = {}
-  for k, thread in pairs(self.threads) do
+  for k, thread in pairs(state.threads()) do
     if thread.id ~= stopped_thread then
       secondary_threads[k] = thread
     end
@@ -84,15 +82,10 @@ function Element:fill_render_state(render_state, stopped_thread)
   self:render_threads("DapUIThread", secondary_threads, render_state)
 end
 
-function Element:should_render(session)
-  return session and session.current_frame and not vim.tbl_isempty(self.render_receivers)
-end
-
 function Element:render(session)
-  if not self:should_render(session) then
+  if vim.tbl_isempty(self.render_receivers) then
     return
   end
-  self.current_frame_id = session.current_frame.id
   local render_state = require("dapui.render").init_state()
   self:fill_render_state(render_state, session.stopped_thread_id)
   for buf, reciever in pairs(self.render_receivers) do
@@ -113,42 +106,7 @@ function M.open_frame()
 end
 
 function M.setup()
-  local dap = require("dap")
-
-  dap.listeners.after.threads[listener_id] = function(session, err, response)
-    if err then
-      return
-    end
-    for _, thread in pairs(response.threads) do
-      Element.threads[thread.id] = thread
-      if not Element.thread_frames[thread.id] then
-        session:request(
-          "stackTrace",
-          {threadId = thread.id},
-          function()
-          end
-        )
-      end
-    end
-    Element:render(session)
-  end
-
-  dap.listeners.after.stackTrace[listener_id] = function(session, err, response, request)
-    if err then
-      return
-    end
-    Element.thread_frames[request.threadId] = response.stackFrames
-    Element:render(session)
-  end
-
-  dap.listeners.after.event_stopped[listener_id] = function(session)
-    session:request(
-      "threads",
-      nil,
-      function()
-      end
-    )
-  end
+  state.on_refresh(Element.render)
 end
 
 M.name = "DAP Stacks"

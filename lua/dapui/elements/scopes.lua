@@ -1,12 +1,11 @@
 local M = {}
 
 local Element = {}
+local state = require("dapui.state")
 local config = require("dapui.config")
 
 local function reset_state()
   Element.render_receiver = {}
-  Element.scopes = {}
-  Element.references = {}
   Element.line_variable_map = {}
   Element.expanded_references = {}
 end
@@ -29,7 +28,7 @@ function Element:render_variables(ref_path, render_state, indent, expanded)
   expanded[ref_path] = true
   local var_path_elems = vim.split(ref_path, "/")
   local var_ref = tonumber(var_path_elems[#var_path_elems])
-  for _, variable in pairs(self.references[var_ref] or {}) do
+  for _, variable in pairs(state.variables(var_ref)) do
     local line_no = render_state:length() + 1
     local var_reference_path = ref_path .. "/" .. variable.variablesReference
     self.line_variable_map[line_no] = var_reference_path
@@ -71,7 +70,7 @@ end
 
 function Element:render_scopes(render_state)
   local expanded = {}
-  for i, scope in pairs(self.scopes or {}) do
+  for i, scope in pairs(state.scopes()) do
     render_state:add_match("DapUIScope", render_state:length() + 1, 1, #scope.name)
     render_state:add_line(scope.name .. ":")
     self:render_variables(tostring(scope.variablesReference), render_state, config().windows.indent, expanded)
@@ -81,12 +80,8 @@ function Element:render_scopes(render_state)
   end
 end
 
-function Element:should_render(session)
-  return session and session.current_frame and not vim.tbl_isempty(self.render_receiver)
-end
-
-function Element:render(session)
-  if not self:should_render(session) then
+function Element:render()
+  if vim.tbl_isempty(self.render_receiver) then
     return
   end
   local render_state = require("dapui.render").init_state()
@@ -104,29 +99,24 @@ function M.toggle_reference()
   if not current_ref_path then
     return
   end
+
   local session = require("dap").session()
   if not session then
     print("No active session to query")
     return
   end
+
+  local current_ref = var_from_ref_path(current_ref_path)
+
   if Element.expanded_references[current_ref_path] then
     Element.expanded_references[current_ref_path] = nil
-    Element:render(session)
+    state.stop_monitor(current_ref)
+    Element:render()
   else
     Element.expanded_references[current_ref_path] = true
-    local var_path_elems = vim.split(current_ref_path, "/")
-    local current_ref = tonumber(var_path_elems[#var_path_elems])
-    session:request(
-      "variables",
-      {variablesReference = current_ref},
-      function()
-        -- nvim-dap requires a callback function to trigger other listeners
-      end
-    )
+    state.monitor(current_ref)
   end
 end
-
-local listener_id = "dapui_scopes"
 
 M.name = "DAP Scopes"
 
@@ -140,7 +130,7 @@ function M.on_open(buf, render_receiver)
     "<Cmd>lua require('dapui.elements.scopes').toggle_reference()<CR>",
     buf
   )
-  Element:render(require("dap").session())
+  Element:render()
 end
 
 function M.on_close(info)
@@ -148,43 +138,7 @@ function M.on_close(info)
 end
 
 function M.setup()
-  local dap = require("dap")
-  dap.listeners.after.variables[listener_id] = function(session, err, response, request)
-    if not err then
-      Element.references[request.variablesReference] = response.variables
-      Element:render(session)
-    end
-  end
-
-  dap.listeners.after.scopes[listener_id] = function(session, err, response)
-    if not err then
-      local references = {}
-      for _, scope in pairs(response.scopes) do
-        references[scope.variablesReference] = scope.variables
-      end
-      local to_refresh = {}
-
-      for ref_path, _ in pairs(Element.expanded_references) do
-        to_refresh[#to_refresh + 1] = var_from_ref_path(ref_path)
-      end
-
-      for _, ref in pairs(to_refresh) do
-        session:request(
-          "variables",
-          {variablesReference = ref},
-          function()
-          end
-        )
-      end
-
-      Element.scopes = vim.tbl_extend("force", Element.scopes, response.scopes)
-      Element.references = vim.tbl_extend("force", Element.references, references)
-      Element:render(session)
-    end
-  end
-  dap.listeners.after.event_terminated[listener_id] = function()
-    reset_state()
-  end
+  state.on_refresh(Element.render)
 end
 
 return M
