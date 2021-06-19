@@ -38,14 +38,15 @@ local default_config = {
       elements.REPL
     },
     height = 10,
-    position = "bottom"
+    position = "bottom",
+    auto_insert = false
   },
   floating = {
     max_height = nil,
     max_width = nil
   },
   windows = {
-    indent = 1
+    indent = 0
   }
 }
 
