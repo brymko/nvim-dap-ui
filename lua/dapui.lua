@@ -140,8 +140,8 @@ function M.setup(config)
     end
 
     if config.tray.auto_insert then 
-        local win_id = vim.fn["bufwinid"]("repl")
-        vim.api.nvim_set_current_win(win_id)
+        local replid = vim.fn["bufwinid"]("repl")
+        vim.api.nvim_set_current_win(replid)
         vim.api.nvim_feedkeys("i", "n", true)
     end
   end
@@ -159,6 +159,10 @@ function M.close(component)
   if not component or component == "tray" then
     tray_open = false
     require("dapui.windows").close_tray()
+    local replid = vim.fn["bufnr"]("repl")
+    if replid ~= -1 then
+      vim.api.nvim_buf_delete(replid, {force = true, unload = false})
+    end
   end
   if not component or component == "sidebar" then
     sidebar_open = false

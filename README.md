@@ -57,7 +57,7 @@ require("dapui").setup({
     collapsed = "⯈"
   },
   mappings = {
-    -- Use a table to apply multiple mappings
+    -- Use a table to apply multiple mappings.
     expand = {"<CR>", "<2-LeftMouse>"},
     open = "o",
     remove = "d",
@@ -66,14 +66,14 @@ require("dapui").setup({
   sidebar = {
     open_on_start = true,
     elements = {
-      -- You can change the order of elements in the sidebar
+      -- You can change the order of elements in the sidebar.
       "scopes",
       "breakpoints",
       "stacks",
       "watches"
     },
     width = 40,
-    position = "left" -- Can be "left" or "right"
+    position = "left" -- Can be "left" or "right".
   },
   tray = {
     open_on_start = true,
@@ -81,11 +81,15 @@ require("dapui").setup({
       "repl"
     },
     height = 10,
-    position = "bottom" -- Can be "bottom" or "top"
+    position = "bottom", -- Can be "bottom" or "top".
+    auto_insert = false, -- Set the cursor in the tray in insert mode.
   },
   floating = {
     max_height = nil, -- These can be integers or a float between 0 and 1.
     max_width = nil   -- Floats will be treated as percentage of your screen.
+  },
+  windows = {
+    indent = 0
   }
 })
 ```
