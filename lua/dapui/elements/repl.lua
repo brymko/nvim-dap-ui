@@ -32,6 +32,8 @@ function M.on_open(buf, render_receiver)
 end
 
 function M.on_close()
+    local key = vim.api.nvim_replace_termcodes("<Esc>", true, false, true)
+    vim.api.nvim_feedkeys(key, 'n', true)
 end
 
 function M.setup(user_config)

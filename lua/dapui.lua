@@ -137,6 +137,12 @@ function M.setup(config)
     if user_config.sidebar.open_on_start then
       M.open("sidebar")
     end
+
+    if config.tray.auto_insert then 
+        local win_id = vim.fn["bufwinid"]("repl")
+        vim.api.nvim_set_current_win(win_id)
+        vim.api.nvim_feedkeys("i", "n", true)
+    end
   end
 
   dap.listeners.before.event_terminated[listener_id] = function()
